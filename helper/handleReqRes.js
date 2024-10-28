@@ -5,6 +5,7 @@ const routes = require("../routes");
 const {
   notFoundHandler,
 } = require("../handler/routesHandlers/notFoundHandler");
+const {parseJSON} = require("./utilities")
 //scaffolding
 const handler = {};
 handler.handleReqRes = (req, res) => {
@@ -33,6 +34,7 @@ handler.handleReqRes = (req, res) => {
   });
   req.on("end", () => {
     realData += decoder.end();
+    requestProperties.body = parseJSON(realData);
     //invoking chosen function based on the requested route
     chosenHandler(requestProperties, (statusCode, payload) => {
       statusCode = typeof statusCode === "number" ? statusCode : 500;
