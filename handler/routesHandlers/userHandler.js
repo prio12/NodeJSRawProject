@@ -1,6 +1,6 @@
 //dependencies
 const lib = require("../../lib/data");
-const {parseJSON} = require("../../helper/utilities")
+const { parseJSON } = require("../../helper/utilities");
 //module scaffolding
 const handler = {};
 
@@ -83,9 +83,9 @@ handler._users.get = (requestProperties, callback) => {
   if (phone) {
     lib.read("users", phone, (data, err) => {
       if (!err && data) {
-        const user = {...parseJSON(data)}
+        const user = { ...parseJSON(data) };
         delete user.password;
-        callback(200, user)
+        callback(200, user);
       } else {
         callback(404, {
           error: "404 : Not Found",
@@ -98,6 +98,66 @@ handler._users.get = (requestProperties, callback) => {
     });
   }
 };
-handler._users.put = (requestProperties, callback) => {};
+handler._users.put = (requestProperties, callback) => {
+  const firstName =
+    typeof requestProperties.body.firstName === "string" &&
+    requestProperties.body.firstName.trim().length > 0
+      ? requestProperties.body.firstName
+      : false;
+  const lastName =
+    typeof requestProperties.body.lastName === "string" &&
+    requestProperties.body.lastName.trim().length > 0
+      ? requestProperties.body.lastName
+      : false;
+  const phone =
+    typeof requestProperties.body.phone === "string" &&
+    requestProperties.body.phone.trim().length === 11
+      ? requestProperties.body.phone
+      : false;
+  const password =
+    typeof requestProperties.body.password === "string" &&
+    requestProperties.body.password.trim().length > 0
+      ? requestProperties.body.password
+      : false;
+
+  if (phone) {
+    if (firstName || lastName || password) {
+      lib.read("users", phone, (data, err) => {
+        const userData = {...parseJSON(data)};
+        if (!err && data) {
+         if (firstName) {
+          userData.firstName = firstName
+         }
+         if (lastName) {
+          userData.lastName = lastName
+         }
+         if (password) {
+          userData.password = password
+         }
+         //update the database with updated data
+         lib.update("users",phone, userData, (err,data) =>{
+            if (!err) {
+              callback (400,{
+                message:"Profile updated successfully!"
+              })
+            } else {
+              callback(400, {
+                error: "There's a problem in your request!",
+              });
+            }
+         })
+        } else {
+          callback(400, {
+            error: "There's a problem in your request!",
+          });
+        }
+      });
+    }
+  } else {
+    callback(400, {
+      error: "There's a problem in your request!",
+    });
+  }
+};
 handler._users.delete = (requestProperties, callback) => {};
 module.exports = handler;
