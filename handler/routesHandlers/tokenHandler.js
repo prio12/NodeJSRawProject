@@ -62,9 +62,27 @@ handler._token.post = (requestProperties, callback) => {
   }
 };
 handler._token.get = (requestProperties, callback) => {
-  // callback(200,{
-  //     message:"This is from token route"
-  // })
+  const id =
+    typeof requestProperties.queryStringObject.id === "string" &&
+    requestProperties.queryStringObject.id.trim().length === 20
+      ? requestProperties.queryStringObject.id
+      : false;
+  if (id) {
+    lib.read("tokens", id, (data, err) => {
+      if (!err && data) {
+        const tokenData = { ...parseJSON(data) };
+        callback(200, tokenData);
+      } else {
+        callback(404, {
+          error: "404 : Not Found",
+        });
+      }
+    });
+  } else {
+    callback(404, {
+      error: "404 : Not Found if not found phone",
+    });
+  }
 };
 handler._token.put = (requestProperties, callback) => {};
 handler._token.delete = (requestProperties, callback) => {};
