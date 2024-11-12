@@ -1,6 +1,7 @@
 //dependencies
 const lib = require("../../lib/data");
 const { parseJSON } = require("../../helper/utilities");
+const tokenVerify = require("./tokenHandler");
 //module scaffolding
 const handler = {};
 
@@ -81,14 +82,28 @@ handler._users.get = (requestProperties, callback) => {
       ? requestProperties.queryStringObject.phone
       : false;
   if (phone) {
-    lib.read("users", phone, (data, err) => {
-      if (!err && data) {
-        const user = { ...parseJSON(data) };
-        delete user.password;
-        callback(200, user);
+    //verify with token before look up the user
+
+    let token =
+      typeof requestProperties.headersObject.token === "string"
+        ? requestProperties.headersObject.token
+        : false;
+    tokenVerify._token.verify(token, phone, (verifiedToken) => {
+      if (verifiedToken) {
+        lib.read("users", phone, (data, err) => {
+          if (!err && data) {
+            const user = { ...parseJSON(data) };
+            delete user.password;
+            callback(200, user);
+          } else {
+            callback(404, {
+              error: "404 : Not Found",
+            });
+          }
+        });
       } else {
-        callback(404, {
-          error: "404 : Not Found",
+        callback(401, {
+          error: "Unauthorized user ",
         });
       }
     });
@@ -121,38 +136,50 @@ handler._users.put = (requestProperties, callback) => {
       : false;
 
   if (phone) {
-    if (firstName || lastName || password) {
-      lib.read("users", phone, (data, err) => {
-        const userData = {...parseJSON(data)};
-        if (!err && data) {
-         if (firstName) {
-          userData.firstName = firstName
-         }
-         if (lastName) {
-          userData.lastName = lastName
-         }
-         if (password) {
-          userData.password = password
-         }
-         //update the database with updated data
-         lib.update("users",phone, userData, (err,data) =>{
-            if (!err) {
-              callback (400,{
-                message:"Profile updated successfully!"
-              })
+    let token =
+      typeof requestProperties.headersObject.token === "string"
+        ? requestProperties.headersObject.token
+        : false;
+    tokenVerify._token.verify(token, phone, (verifiedToken) => {
+      if (verifiedToken) {
+        if (firstName || lastName || password) {
+          lib.read("users", phone, (data, err) => {
+            const userData = { ...parseJSON(data) };
+            if (!err && data) {
+              if (firstName) {
+                userData.firstName = firstName;
+              }
+              if (lastName) {
+                userData.lastName = lastName;
+              }
+              if (password) {
+                userData.password = password;
+              }
+              //update the database with updated data
+              lib.update("users", phone, userData, (err, data) => {
+                if (!err) {
+                  callback(400, {
+                    message: "Profile updated successfully!",
+                  });
+                } else {
+                  callback(400, {
+                    error: "There's a problem in your request!",
+                  });
+                }
+              });
             } else {
               callback(400, {
                 error: "There's a problem in your request!",
               });
             }
-         })
-        } else {
-          callback(400, {
-            error: "There's a problem in your request!",
           });
         }
-      });
-    }
+      } else {
+        callback(401, {
+          error: "Unauthorized user ",
+        });
+      }
+    });
   } else {
     callback(400, {
       error: "There's a problem in your request!",
@@ -165,30 +192,42 @@ handler._users.delete = (requestProperties, callback) => {
     requestProperties.queryStringObject.phone.trim().length === 11
       ? requestProperties.queryStringObject.phone
       : false;
-      if (phone) {
-        lib.read("users",phone, (data,error) =>{
+  if (phone) {
+    let token =
+      typeof requestProperties.headersObject.token === "string"
+        ? requestProperties.headersObject.token
+        : false;
+    tokenVerify._token.verify(token, phone, (verifiedToken) => {
+      if (verifiedToken) {
+        lib.read("users", phone, (data, error) => {
           if (!error && data) {
-            lib.delete("users",phone, (err) =>{
+            lib.delete("users", phone, (err) => {
               if (!err) {
                 callback(200, {
-                  message:"User was deleted successfully!"
-                })
+                  message: "User was deleted successfully!",
+                });
               } else {
                 callback(500, {
-                  error:"There was a problem from server side!"
-                })
+                  error: "There was a problem from server side!",
+                });
               }
-            })
+            });
           } else {
             callback(500, {
-              error:"There was a problem in your request!"
-            })
+              error: "There was a problem in your request!",
+            });
           }
-        })
+        });
       } else {
-        callback(400, {
-          error:"There was a problem in your request!"
-        })
+        callback(401, {
+          error: "Unauthorized user ",
+        });
       }
+    });
+  } else {
+    callback(400, {
+      error: "There was a problem in your request!",
+    });
+  }
 };
 module.exports = handler;

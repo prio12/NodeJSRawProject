@@ -91,44 +91,45 @@ handler._token.put = (requestProperties, callback) => {
       ? requestProperties.body.id
       : false;
 
-      const extend = typeof requestProperties.body.extend === "boolean" && 
-      requestProperties.body.extend === true
-        ? true
-        : false;
+  const extend =
+    typeof requestProperties.body.extend === "boolean" &&
+    requestProperties.body.extend === true
+      ? true
+      : false;
 
-        if (id && extend) {
-          lib.read("tokens", id, (data,error1) => {
-            if (data && !error1) {
-              let tokenData = parseJSON(data);
-              //checking if the token expired
-              if (tokenData.expires > Date.now()) {
-                tokenData.expires = Date.now() * 60 * 60 * 100;
-                //store the updated value
-                lib.update("tokens", id, tokenData, (err3) =>{
-                  if (!err3) {
-                    callback(200,tokenData)
-                  } else {
-                    callback(400, {
-                      error:"There was a problem while updating token data"
-                    })
-                  }
-                })
-              } else {
-                callback(400, {
-                  error:"Token already expired"
-                })
-              }
+  if (id && extend) {
+    lib.read("tokens", id, (data, error1) => {
+      if (data && !error1) {
+        let tokenData = parseJSON(data);
+        //checking if the token expired
+        if (tokenData.expires > Date.now()) {
+          tokenData.expires = Date.now() * 60 * 60 * 100;
+          //store the updated value
+          lib.update("tokens", id, tokenData, (err3) => {
+            if (!err3) {
+              callback(200, tokenData);
             } else {
-              callback(400,{
-                error:error1
-              })
+              callback(400, {
+                error: "There was a problem while updating token data",
+              });
             }
-          })
+          });
         } else {
           callback(400, {
-            error:"There was a problem in your request!"
-          })
+            error: "Token already expired",
+          });
         }
+      } else {
+        callback(400, {
+          error: error1,
+        });
+      }
+    });
+  } else {
+    callback(400, {
+      error: "There was a problem in your request!",
+    });
+  }
 };
 handler._token.delete = (requestProperties, callback) => {
   const id =
@@ -136,31 +137,46 @@ handler._token.delete = (requestProperties, callback) => {
     requestProperties.queryStringObject.id.trim().length === 20
       ? requestProperties.queryStringObject.id
       : false;
-      if (id) {
-        lib.read("tokens",id, (data,error) =>{
-          if (!error && data) {
-            lib.delete("tokens",id, (err) =>{
-              if (!err) {
-                callback(200, {
-                  message:"Token was deleted successfully!"
-                })
-              } else {
-                callback(500, {
-                  error:"There was a problem from server side!"
-                })
-              }
-            })
+  if (id) {
+    lib.read("tokens", id, (data, error) => {
+      if (!error && data) {
+        lib.delete("tokens", id, (err) => {
+          if (!err) {
+            callback(200, {
+              message: "Token was deleted successfully!",
+            });
           } else {
             callback(500, {
-              error:"There was a problem in your request!"
-            })
+              error: "There was a problem from server side!",
+            });
           }
-        })
+        });
       } else {
-        callback(400, {
-          error:"There was a problem in your request!"
-        })
+        callback(500, {
+          error: "There was a problem in your request!",
+        });
       }
+    });
+  } else {
+    callback(400, {
+      error: "There was a problem in your request!",
+    });
+  }
+};
+
+handler._token.verify = (id, phone, callback) => {
+  lib.read("tokens", id, (data, error) => {
+    let tokenData = parseJSON(data);
+    if (!error && tokenData) {
+      if (tokenData.phone === phone && tokenData.expires > Date.now()) {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    } else {
+      callback(false);
+    }
+  });
 };
 
 module.exports = handler;
