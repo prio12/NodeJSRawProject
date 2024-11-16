@@ -60,10 +60,10 @@ handler._check.post = (requestProperties, callback) => {
       console.log(err1);
       if (!err1 && data) {
         let tokenData = parseJSON(data);
-        const userPhone = tokenData.phone;
-        lib.read("users", userPhone, (userData, err2) => {
+        const phone = tokenData.phone;
+        lib.read("users", phone, (userData, err2) => {
           if (!err2 && userData) {
-            tokenVerify._token.verify(token, userPhone, (verifiedToken) => {
+            tokenVerify._token.verify(token, phone, (verifiedToken) => {
               if (verifiedToken) {
                 let userObject = parseJSON(userData);
                 let userChecks =
@@ -76,7 +76,7 @@ handler._check.post = (requestProperties, callback) => {
                   const checkId = randomString(20);
                   const checkObject = {
                     checkId,
-                    phone: userPhone,
+                    phone: phone,
                     protocol,
                     url,
                     method,
@@ -87,9 +87,9 @@ handler._check.post = (requestProperties, callback) => {
                   lib.create("checks", checkId, checkObject, (err4) => {
                     if (!err4) {
                       userObject.checks = userChecks;
-                      userObject.checks.push = checkId;
+                      userObject.checks.push(checkId);
                       //update the existing userdata
-                      lib.update("users", userPhone, userObject, (err5) => {
+                      lib.update("users", phone, userObject, (err5) => {
                         if (!err5) {
                           callback(200, userObject);
                         } else {
@@ -206,52 +206,52 @@ handler._check.put = (requestProperties, callback) => {
 
   if (id) {
     if (protocol || url || method || successCodes || timeOutSeconds) {
-      lib.read("checks",id, (data, err1) =>{
+      lib.read("checks", id, (data, err1) => {
         if (!err1 && data) {
           let checkData = parseJSON(data);
           let token =
-          typeof requestProperties.headersObject.token === "string"
-            ? requestProperties.headersObject.token
-            : false;
-            tokenVerify._token.verify(token,checkData.phone, (verifiedToken) =>{
-              if (verifiedToken) {
-                if (protocol) {
-                  checkData.protocol = protocol
-                }
-                if (protocol) {
-                  checkData.url = url
-                }
-                if (protocol) {
-                  checkData.method = method
-                }
-                if (protocol) {
-                  checkData.successCodes = successCodes
-                }
-                if (protocol) {
-                  checkData.timeOutSeconds = timeOutSeconds
-                }
-
-                lib.update("checks",id, checkData, (err2) =>{
-                  if(!err2) {
-                    callback(200, checkData)
-                  } else {
-                    callback(500, {
-                      error:"There was a problem in server side!"
-                    })
-                  }
-                })
-              } else {
-                callback(403, {
-                  error:"Authentication error !"
-                })
+            typeof requestProperties.headersObject.token === "string"
+              ? requestProperties.headersObject.token
+              : false;
+          tokenVerify._token.verify(token, checkData.phone, (verifiedToken) => {
+            if (verifiedToken) {
+              if (protocol) {
+                checkData.protocol = protocol;
               }
-            })
+              if (protocol) {
+                checkData.url = url;
+              }
+              if (protocol) {
+                checkData.method = method;
+              }
+              if (protocol) {
+                checkData.successCodes = successCodes;
+              }
+              if (protocol) {
+                checkData.timeOutSeconds = timeOutSeconds;
+              }
+
+              lib.update("checks", id, checkData, (err2) => {
+                if (!err2) {
+                  callback(200, checkData);
+                } else {
+                  callback(500, {
+                    error: "There was a problem in server side!",
+                  });
+                }
+              });
+            } else {
+              callback(403, {
+                error: "Authentication error !",
+              });
+            }
+          });
         } else {
-          callback(500,{
+          callback(500, {
             error: "There was a problem in the server side!",
-          })
+          });
         }
-      })
+      });
     } else {
       callback(400, {
         error: "You must provide at least one field to update",
@@ -263,5 +263,98 @@ handler._check.put = (requestProperties, callback) => {
     });
   }
 };
-handler._check.delete = (requestProperties, callback) => {};
+handler._check.delete = (requestProperties, callback) => {
+  const id =
+    typeof requestProperties.queryStringObject.id === "string" &&
+    requestProperties.queryStringObject.id.trim().length === 20
+      ? requestProperties.queryStringObject.id
+      : false;
+
+  if (id) {
+    // lookup the check
+    lib.read("checks", id, ( checkData, err1 ) => {
+      if ( checkData && !err1  ) {
+        const token =
+          typeof requestProperties.headersObject.token === "string"
+            ? requestProperties.headersObject.token
+            : false;
+
+        tokenVerify._token.verify(
+          token,
+          parseJSON(checkData).phone,
+          (tokenIsValid) => {
+            if (tokenIsValid) {
+              // delete the check data
+              lib.delete("checks", id, (err2) => {
+                if (!err2) {
+                  lib.read(
+                    "users",
+                    parseJSON(checkData).phone,
+                    (userData,err3) => {
+                      const userObject = parseJSON(userData);
+                      if (!err3 && userData) {
+                        const userChecks =
+                          typeof userObject.checks === "object" &&
+                          userObject.checks instanceof Array
+                            ? userObject.checks
+                            : [];
+
+                        // remove the deleted check id from user's list of checks
+                        const checkPosition = userChecks.indexOf(id);
+                        if (checkPosition > -1) {
+                          userChecks.splice(checkPosition, 1);
+                          // resave the user data
+                          userObject.checks = userChecks;
+                          lib.update(
+                            "users",
+                            userObject.phone,
+                            userObject,
+                            (err4) => {
+                              if (!err4) {
+                                callback(200);
+                              } else {
+                                callback(500, {
+                                  error: "There was a server side problem!",
+                                });
+                              }
+                            }
+                          );
+                        } else {
+                          callback(500, {
+                            error:
+                              "The check id that you are trying to remove is not found in user!",
+                          });
+                        }
+                      } else {
+                        callback(500, {
+                          error: "There was a server side problem!",
+                        });
+                      }
+                    }
+                  );
+                } else {
+                  callback(500, {
+                    error: "There was a server side problem!",
+                  });
+                }
+              });
+            } else {
+              callback(403, {
+                error: "Authentication failure!",
+              });
+            }
+          }
+        );
+      } else {
+        callback(500, {
+          error: "You have a problem in your request bro 1",
+        });
+      }
+    });
+  } else {
+    callback(400, {
+      error: "You have a problem in your request bro 2",
+    });
+  }
+};
 module.exports = handler;
